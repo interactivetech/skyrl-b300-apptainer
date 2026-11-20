@@ -19,6 +19,12 @@ logs/
 ckpts/
 exports/
 tmp/
+venvs/
+python/
+bin/
+opt/
+build/
+skyrl-source-commit.txt
 
 # Python and local editor state
 __pycache__/
