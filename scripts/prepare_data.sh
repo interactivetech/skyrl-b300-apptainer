@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
-# Run on a node that has network access to OpenReward, with the SIF present.
+# Fetch OpenReward terminal tasks directly into the native SkyRL virtualenv.
+# Run inside an existing GPU-enabled Slurm shell (or another networked node).
 set -Eeuo pipefail
-: "${PROJECT_ROOT:?Set PROJECT_ROOT}"
-: "${OPENREWARD_API_KEY:?Set OPENREWARD_API_KEY}"
-ROOT="$(realpath "$PROJECT_ROOT")"
-mkdir -p "$ROOT/data" "$ROOT/cache/uv" "$ROOT/cache/hf"
-export APPTAINERENV_OPENREWARD_API_KEY="$OPENREWARD_API_KEY"
-export APPTAINERENV_UV_CACHE_DIR="$ROOT/cache/uv"
-export APPTAINERENV_HF_HOME="$ROOT/cache/hf"
-apptainer exec --cleanenv --bind "$ROOT:$ROOT" --pwd "$ROOT/SkyRL" \
- "$ROOT/images/skyrl-cu13.sif" bash -c '
-  export PATH="/home/ray/.local/bin:$PATH"
-  uv run --isolated --extra fsdp --with openreward --with pyarrow \
-    python examples/train_integrations/openreward/prepare_tasks.py \
-    --env GeneralReasoning/TerminalHorizon --split train \
-    --max-tasks 16 --output "$1/data/train.parquet"
-' bash "$ROOT"
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$HERE/native_env.sh"
+: "${OPENREWARD_API_KEY:?Export OPENREWARD_API_KEY before preparing tasks}"
+[[ -x "$SKYRL_VENV/bin/python" ]] || { echo "Run scripts/install_native.sh first" >&2; exit 1; }
+[[ -d "$SKYRL_ROOT" ]] || { echo "Missing SkyRL checkout: $SKYRL_ROOT" >&2; exit 1; }
+
+source "$SKYRL_VENV/bin/activate"
+cd "$SKYRL_ROOT"
+python examples/train_integrations/openreward/prepare_tasks.py \
+  --env GeneralReasoning/TerminalHorizon \
+  --split train \
+  --max-tasks "${MAX_TASKS:-16}" \
+  --output "$PROJECT_ROOT/data/train.parquet"
+echo "Prepared task file: $PROJECT_ROOT/data/train.parquet"
